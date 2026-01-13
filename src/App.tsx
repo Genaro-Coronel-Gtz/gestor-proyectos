@@ -6,7 +6,7 @@ import type { Project, Task } from './store';
 import {
   Container, Box, Typography, Button, Card, CardContent, CardHeader, TextField, Chip,
   LinearProgress, Grid, Stack, IconButton, CardActionArea, Link, Paper,
-  Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, FormControlLabel, Checkbox
+  Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, FormControlLabel, Checkbox, useMediaQuery, useTheme as useMuiTheme
 } from '@mui/material';
 import {
   Add, CheckCircle, RadioButtonUnchecked, Assignment, CalendarToday, Person, AttachMoney,
@@ -29,6 +29,8 @@ const getStats = (tasks: Task[]) => {
 // --- DIALOGO/MODAL PARA TAREAS ---
 const TaskFormModal = ({ open, onClose, onSave, task }: { open: boolean, onClose: () => void, onSave: (task: Task) => void, task: Task | null }) => {
   const [formData, setFormData] = useState<Task | null>(null);
+  const muiTheme = useMuiTheme();
+  const fullScreen = useMediaQuery(muiTheme.breakpoints.down('md'));
 
   useEffect(() => {
     setFormData(task);
@@ -47,7 +49,7 @@ const TaskFormModal = ({ open, onClose, onSave, task }: { open: boolean, onClose
   };
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
+    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth fullScreen={fullScreen}>
       <DialogTitle>{formData.id.startsWith('new-') ? 'Crear Nueva Tarea' : 'Editar Tarea'}</DialogTitle>
       <DialogContent>
         <Grid container spacing={2} sx={{ pt: 1 }}>
