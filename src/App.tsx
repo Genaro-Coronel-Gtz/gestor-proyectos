@@ -151,7 +151,7 @@ const ProjectDetail = () => {
           title={<Typography variant="h3" component="h1" gutterBottom>{project.name}</Typography>}
           subheader={`ID: ${project._id}`}
           action={
-            <Stack direction="row" spacing={2}>
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
               <IconButton sx={{ ml: 1 }} onClick={toggleTheme} color="inherit">
                 {mode === 'dark' ? <Brightness7 /> : <Brightness4 />}
               </IconButton>
@@ -240,7 +240,7 @@ const Dashboard = () => {
   const { mode, toggleTheme } = useTheme();
 
   return (
-    <Container maxWidth="xl" sx={{ py: 5 }}>
+    <Container maxWidth="lg" sx={{ py: 5 }}>
       <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems="center" spacing={2} sx={{ mb: 6 }}>
         <Box>
           <Typography variant="h2" component="h1" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
@@ -264,7 +264,7 @@ const Dashboard = () => {
           />
           <Button variant="contained" onClick={() => {
             if (!name) return;
-            dispatch(addProject({ _id: new Date().toISOString(), name, tasks: [] }));
+            dispatch(addProject({ _id: crypto.randomUUID(), name, tasks: [] }));
             setName('');
           }}>
             Crear
