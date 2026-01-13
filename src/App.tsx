@@ -10,8 +10,9 @@ import {
 } from '@mui/material';
 import {
   Add, CheckCircle, RadioButtonUnchecked, BusinessCenter, CalendarToday, Person, AttachMoney,
-  Edit, Save, ArrowBack, Delete, GridView, Notes
+  Edit, Save, ArrowBack, Delete, GridView, Notes, Brightness4, Brightness7
 } from '@mui/icons-material';
+import { useTheme } from './ThemeContext';
 
 import PouchDB from 'pouchdb';
 const db = new PouchDB<Project>('projects_db');
@@ -25,36 +26,118 @@ const getStats = (tasks: Task[]) => {
   return { percentage, completed, total, budget };
 };
 
+// --- DIALOGO/MODAL PARA TAREAS ---
+const TaskFormModal = ({ open, onClose, onSave, task }: { open: boolean, onClose: () => void, onSave: (task: Task) => void, task: Task | null }) => {
+  const [formData, setFormData] = useState<Task | null>(null);
+
+  useEffect(() => {
+    setFormData(task);
+  }, [task]);
+
+  if (!formData) return null;
+
+  const handleChange = (field: keyof Task, value: any) => {
+    setFormData(prev => prev ? { ...prev, [field]: value } : null);
+  };
+  
+  const handleSave = () => {
+    if (formData) {
+      onSave(formData);
+    }
+  };
+
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
+      <DialogTitle>{formData.id.startsWith('new-') ? 'Crear Nueva Tarea' : 'Editar Tarea'}</DialogTitle>
+      <DialogContent>
+        <Grid container spacing={2} sx={{ pt: 1 }}>
+          <Grid item xs={12} md={6}>
+            <TextField autoFocus label="Nombre de tarea" fullWidth value={formData.name} onChange={e => handleChange('name', e.target.value)} />
+          </Grid>
+          <Grid item xs={12} md={6}>
+            <TextField label="Responsable" fullWidth value={formData.assignee} onChange={e => handleChange('assignee', e.target.value)} />
+          </Grid>
+          <Grid item xs={6}>
+            <TextField label="Fecha de Inicio" type="date" fullWidth InputLabelProps={{ shrink: true }} value={formData.startDate} onChange={e => handleChange('startDate', e.target.value)} />
+          </Grid>
+          <Grid item xs={6}>
+            <TextField label="Fecha de Fin" type="date" fullWidth InputLabelProps={{ shrink: true }} value={formData.endDate} onChange={e => handleChange('endDate', e.target.value)} />
+          </Grid>
+          <Grid item xs={12}>
+            <TextField label="Presupuesto" type="number" fullWidth value={formData.budget} onChange={e => handleChange('budget', Number(e.target.value))} />
+          </Grid>
+          <Grid item xs={12}>
+            <TextField label="Notas" multiline rows={4} fullWidth value={formData.notes} onChange={e => handleChange('notes', e.target.value)} />
+          </Grid>
+          <Grid item xs={12}>
+            <FormControlLabel control={<Checkbox checked={formData.completed} onChange={e => handleChange('completed', e.target.checked)} />} label="Completada" />
+          </Grid>
+        </Grid>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose}>Cancelar</Button>
+        <Button onClick={handleSave} variant="contained">Guardar</Button>
+      </DialogActions>
+    </Dialog>
+  );
+};
+
+
 // --- VISTA: DETALLE DEL PROYECTO ---
 const ProjectDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
   const project = useAppSelector(state => state.projects.list.find(p => p._id === id));
+  const { mode, toggleTheme } = useTheme();
   
-  const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [taskModalOpen, setTaskModalOpen] = useState(false);
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
 
   useEffect(() => {
-    // Si el proyecto se elimina mientras se visualiza, navega al inicio.
     if (!project) {
       navigate('/');
     }
   }, [project, navigate]);
 
-  if (!project) return null; // O un spinner de carga
+  if (!project) return null;
 
   const stats = getStats(project.tasks);
 
-  const handleUpdateTask = (taskId: string, data: Partial<Task>) => {
-    const updatedTasks = project.tasks.map(t => t.id === taskId ? { ...t, ...data } : t);
+  const handleOpenNewTask = () => {
+    setEditingTask({ id: `new-${crypto.randomUUID()}`, name: "Nueva Tarea", duration: "1d", startDate: new Date().toISOString().split('T')[0], endDate: "", estimatedTime: "8h", assignee: "Sin asignar", notes: "", budget: 0, completed: false });
+    setTaskModalOpen(true);
+  };
+  
+  const handleOpenEditTask = (task: Task) => {
+    setEditingTask(task);
+    setTaskModalOpen(true);
+  };
+
+  const handleSaveTask = (taskToSave: Task) => {
+    let updatedTasks;
+    if (taskToSave.id.startsWith('new-')) {
+      // Es una nueva tarea
+      updatedTasks = [...project.tasks, { ...taskToSave, id: crypto.randomUUID() }];
+    } else {
+      // Es una tarea existente
+      updatedTasks = project.tasks.map(t => t.id === taskToSave.id ? taskToSave : t);
+    }
     dispatch(updateProject({ ...project, tasks: updatedTasks }));
+    setTaskModalOpen(false);
+    setEditingTask(null);
   };
 
   const handleDeleteProject = () => {
+    if(!project) return;
     dispatch(deleteProject(project._id));
     setDeleteDialogOpen(false);
-    // La navegación se gestiona en el useEffect
+  };
+  
+  const handleDeleteTask = (taskId: string) => {
+    const updatedTasks = project.tasks.filter(t => t.id !== taskId);
+    dispatch(updateProject({ ...project, tasks: updatedTasks }));
   };
 
   return (
@@ -69,23 +152,13 @@ const ProjectDetail = () => {
           subheader={`ID: ${project._id}`}
           action={
             <Stack direction="row" spacing={2}>
-              <Button
-                variant="contained"
-                startIcon={<Add />}
-                onClick={() => {
-                  const newTask: Task = { id: crypto.randomUUID(), name: "Nueva Tarea", duration: "1d", startDate: new Date().toISOString().split('T')[0], endDate: "", estimatedTime: "8h", assignee: "Sin asignar", notes: "", budget: 0, completed: false };
-                  dispatch(updateProject({ ...project, tasks: [...project.tasks, newTask] }));
-                  setEditingTaskId(newTask.id);
-                }}
-              >
+              <IconButton sx={{ ml: 1 }} onClick={toggleTheme} color="inherit">
+                {mode === 'dark' ? <Brightness7 /> : <Brightness4 />}
+              </IconButton>
+              <Button variant="contained" startIcon={<Add />} onClick={handleOpenNewTask}>
                 Nueva Tarea
               </Button>
-              <Button
-                variant="outlined"
-                color="error"
-                startIcon={<Delete />}
-                onClick={() => setDeleteDialogOpen(true)}
-              >
+              <Button variant="outlined" color="error" startIcon={<Delete />} onClick={() => setDeleteDialogOpen(true)}>
                 Eliminar Proyecto
               </Button>
             </Stack>
@@ -105,76 +178,47 @@ const ProjectDetail = () => {
             {project.tasks.map(task => (
               <Paper 
                 key={task.id} 
-                elevation={editingTaskId === task.id ? 4 : 1}
-                sx={{ p: 2, transition: 'box-shadow 0.3s', opacity: task.completed ? 0.7 : 1, bgcolor: task.completed ? 'grey.50' : 'background.paper' }}
+                elevation={1}
+                sx={{ p: 2, opacity: task.completed ? 0.7 : 1, bgcolor: task.completed ? 'grey.50' : 'background.paper' }}
               >
-                {editingTaskId === task.id ? (
-                  <Box>
-                    <Grid container spacing={2} alignItems="center" flex={1}>
-                      <Grid item xs={12} md={6}>
-                        <TextField size="small" fullWidth label="Nombre de tarea" value={task.name} onChange={e => handleUpdateTask(task.id, { name: e.target.value })} />
-                      </Grid>
-                      <Grid item xs={12} md={6}>
-                        <TextField size="small" fullWidth label="Responsable" value={task.assignee} onChange={e => handleUpdateTask(task.id, { assignee: e.target.value })} />
-                      </Grid>
-                      <Grid item xs={6} md={3}>
-                        <TextField size="small" fullWidth label="Fecha de Inicio" type="date" InputLabelProps={{ shrink: true }} value={task.startDate} onChange={e => handleUpdateTask(task.id, { startDate: e.target.value })} />
-                      </Grid>
-                       <Grid item xs={6} md={3}>
-                        <TextField size="small" fullWidth label="Fecha de Fin" type="date" InputLabelProps={{ shrink: true }} value={task.endDate} onChange={e => handleUpdateTask(task.id, { endDate: e.target.value })} />
-                      </Grid>
-                      <Grid item xs={12} md={6}>
-                        <TextField size="small" fullWidth label="Presupuesto" type="number" value={task.budget} onChange={e => handleUpdateTask(task.id, { budget: Number(e.target.value) })} />
-                      </Grid>
-                       <Grid item xs={12}>
-                        <TextField size="small" fullWidth label="Notas" multiline rows={3} value={task.notes} onChange={e => handleUpdateTask(task.id, { notes: e.target.value })} />
-                      </Grid>
-                    </Grid>
-                    <Box sx={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 2}}>
-                        <FormControlLabel control={<Checkbox checked={task.completed} onChange={e => handleUpdateTask(task.id, { completed: e.target.checked })} />} label="Completada" />
-                        <Button variant="contained" color="primary" onClick={() => setEditingTaskId(null)} startIcon={<Save />}>Guardar</Button>
+                <Box>
+                  <Box display="flex" justifyContent="space-between" alignItems="center">
+                    <FormControlLabel control={<Checkbox checked={task.completed} onChange={e => handleSaveTask({ ...task, completed: e.target.checked })} />} label={<Typography variant="h6" sx={{ textDecoration: task.completed ? 'line-through' : 'none' }}>{task.name}</Typography>} />
+                    <Box>
+                      <IconButton color="default" onClick={() => handleOpenEditTask(task)}><Edit /></IconButton>
+                      <IconButton color="error" onClick={() => handleDeleteTask(task.id)}><Delete /></IconButton>
                     </Box>
                   </Box>
-                ) : (
-                  <Box>
-                    <Box display="flex" justifyContent="space-between" alignItems="center">
-                        <FormControlLabel control={<Checkbox checked={task.completed} onChange={e => handleUpdateTask(task.id, { completed: e.target.checked })} />} label={<Typography variant="h6" sx={{ textDecoration: task.completed ? 'line-through' : 'none' }}>{task.name}</Typography>} />
-                      <Box>
-                        <IconButton color="default" onClick={() => setEditingTaskId(task.id)}><Edit /></IconButton>
-                        <IconButton color="error" onClick={() => {
-                          const updated = project.tasks.filter(t => t.id !== task.id);
-                          dispatch(updateProject({ ...project, tasks: updated }));
-                        }}><Delete /></IconButton>
-                      </Box>
-                    </Box>
-                    <Stack direction="row" spacing={2} mt={1} flexWrap="wrap" gap={1}>
-                      <Chip icon={<Person />} label={task.assignee || 'N/A'} size="small" />
-                      <Chip icon={<AttachMoney />} label={`$${task.budget || 0}`} size="small" />
-                      <Chip icon={<CalendarToday />} label={`Inicio: ${task.startDate || 'N/A'}`} size="small" />
-                      <Chip icon={<CalendarToday />} label={`Fin: ${task.endDate || 'N/A'}`} size="small" />
-                    </Stack>
-                    {task.notes && (
-                        <Paper elevation={0} variant="outlined" sx={{p: 2, mt: 2, bgcolor: 'grey.50'}}>
-                            <Typography variant="body2" color="text.secondary">{task.notes}</Typography>
-                        </Paper>
-                    )}
-                  </Box>
-                )}
+                  <Stack direction="row" spacing={2} mt={1} flexWrap="wrap" gap={1}>
+                    <Chip icon={<Person />} label={task.assignee || 'N/A'} size="small" />
+                    <Chip icon={<AttachMoney />} label={`$${task.budget || 0}`} size="small" />
+                    <Chip icon={<CalendarToday />} label={`Inicio: ${task.startDate || 'N/A'}`} size="small" />
+                    <Chip icon={<CalendarToday />} label={`Fin: ${task.endDate || 'N/A'}`} size="small" />
+                  </Stack>
+                  {task.notes && (
+                    <Paper elevation={0} variant="outlined" sx={{ p: 2, mt: 2, bgcolor: 'grey.100' }}>
+                      <Typography variant="body2" color="text.secondary">{task.notes}</Typography>
+                    </Paper>
+                  )}
+                </Box>
               </Paper>
             ))}
           </Stack>
         </CardContent>
       </Card>
       
-      {/* Dialogo de confirmación de borrado */}
-      <Dialog
-        open={deleteDialogOpen}
-        onClose={() => setDeleteDialogOpen(false)}
-      >
+      <TaskFormModal
+        open={taskModalOpen}
+        onClose={() => setTaskModalOpen(false)}
+        onSave={handleSaveTask}
+        task={editingTask}
+      />
+
+      <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)}>
         <DialogTitle>Confirmar Eliminación</DialogTitle>
         <DialogContent>
           <DialogContentText>
-            ¿Estás seguro de que quieres eliminar el proyecto "{project.name}"? Esta acción no se puede deshacer.
+            ¿Estás seguro de que quieres eliminar el proyecto "{project?.name}"? Esta acción no se puede deshacer.
           </DialogContentText>
         </DialogContent>
         <DialogActions>
@@ -193,6 +237,7 @@ const Dashboard = () => {
   const projects = useAppSelector(state => state.projects.list);
   const dispatch = useAppDispatch();
   const [name, setName] = useState('');
+  const { mode, toggleTheme } = useTheme();
 
   return (
     <Container maxWidth="xl" sx={{ py: 5 }}>
@@ -200,6 +245,9 @@ const Dashboard = () => {
         <Box>
           <Typography variant="h2" component="h1" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
             <GridView color="primary" sx={{ fontSize: 40 }}/> Proyectos
+            <IconButton sx={{ ml: 1 }} onClick={toggleTheme} color="inherit">
+              {mode === 'dark' ? <Brightness7 /> : <Brightness4 />}
+            </IconButton>
           </Typography>
           <Typography variant="h6" color="text.secondary" component="p">
             Gestiona tus tareas y presupuestos en un solo lugar.
