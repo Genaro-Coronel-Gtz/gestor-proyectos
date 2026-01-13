@@ -10,7 +10,7 @@ import {
 } from '@mui/material';
 import {
   Add, CheckCircle, RadioButtonUnchecked, Assignment, CalendarToday, Person, AttachMoney,
-  Edit, Save, ArrowBack, Delete, GridView, Notes, Brightness4, Brightness7
+  Edit, Save, ArrowBack, Delete, GridView, Notes, Brightness4, Brightness7, Visibility
 } from '@mui/icons-material';
 import { useTheme } from './ThemeContext';
 
@@ -36,7 +36,7 @@ interface ImagePreview {
 }
 
 // --- DIALOGO/MODAL PARA TAREAS ---
-const TaskFormModal = ({ open, onClose, onSave, task, projectId }: { open: boolean, onClose: () => void, onSave: (task: Task, imagePreviews: ImagePreview[]) => void, task: Task | null, projectId: string }) => {
+const TaskFormModal = ({ open, onClose, onSave, task, projectId, readOnly }: { open: boolean, onClose: () => void, onSave: (task: Task, imagePreviews: ImagePreview[]) => void, task: Task | null, projectId: string, readOnly: boolean }) => {
   const [formData, setFormData] = useState<Task | null>(null);
   const [imagePreviews, setImagePreviews] = useState<ImagePreview[]>([]);
   const muiTheme = useMuiTheme();
@@ -144,25 +144,25 @@ const TaskFormModal = ({ open, onClose, onSave, task, projectId }: { open: boole
       <DialogContent>
         <Grid container spacing={2} sx={{ pt: 1 }}>
           <Grid item xs={12} md={6}>
-            <TextField autoFocus label="Nombre de tarea" fullWidth value={formData.name} onChange={e => handleChange('name', e.target.value)} />
+            <TextField autoFocus label="Nombre de tarea" fullWidth value={formData.name} onChange={e => handleChange('name', e.target.value)} disabled={readOnly} />
           </Grid>
           <Grid item xs={12} md={6}>
-            <TextField label="Responsable" fullWidth value={formData.assignee} onChange={e => handleChange('assignee', e.target.value)} />
+            <TextField label="Responsable" fullWidth value={formData.assignee} onChange={e => handleChange('assignee', e.target.value)} disabled={readOnly} />
           </Grid>
           <Grid item xs={6}>
-            <TextField label="Fecha de Inicio" type="date" fullWidth InputLabelProps={{ shrink: true }} value={formData.startDate} onChange={e => handleChange('startDate', e.target.value)} />
+            <TextField label="Fecha de Inicio" type="date" fullWidth InputLabelProps={{ shrink: true }} value={formData.startDate} onChange={e => handleChange('startDate', e.target.value)} disabled={readOnly} />
           </Grid>
           <Grid item xs={6}>
-            <TextField label="Fecha de Fin" type="date" fullWidth InputLabelProps={{ shrink: true }} value={formData.endDate} onChange={e => handleChange('endDate', e.target.value)} />
+            <TextField label="Fecha de Fin" type="date" fullWidth InputLabelProps={{ shrink: true }} value={formData.endDate} onChange={e => handleChange('endDate', e.target.value)} disabled={readOnly} />
           </Grid>
           <Grid item xs={12}>
-            <TextField label="Presupuesto" type="number" fullWidth value={formData.budget} onChange={e => handleChange('budget', Number(e.target.value))} />
+            <TextField label="Presupuesto" type="number" fullWidth value={formData.budget} onChange={e => handleChange('budget', Number(e.target.value))} disabled={readOnly} />
           </Grid>
           <Grid item xs={12}>
-            <TextField label="Notas" multiline rows={4} fullWidth value={formData.notes} onChange={e => handleChange('notes', e.target.value)} />
+            <TextField label="Notas" multiline rows={4} fullWidth value={formData.notes} onChange={e => handleChange('notes', e.target.value)} disabled={readOnly} />
           </Grid>
           <Grid item xs={12}>
-            <FormControlLabel control={<Checkbox checked={formData.completed} onChange={e => handleChange('completed', e.target.checked)} />} label="Completada" />
+            <FormControlLabel control={<Checkbox checked={formData.completed} onChange={e => handleChange('completed', e.target.checked)} disabled={readOnly} />} label="Completada" />
           </Grid>
           <Grid item xs={12}>
             <Typography variant="subtitle1" gutterBottom>Fotos (máximo 3)</Typography>
@@ -173,29 +173,34 @@ const TaskFormModal = ({ open, onClose, onSave, task, projectId }: { open: boole
               style={{ display: 'none' }}
               id="task-file-upload"
               onChange={handleFileChange}
+              disabled={readOnly} // Disable file input itself
             />
-            <label htmlFor="task-file-upload">
-              <Button variant="outlined" component="span" startIcon={<Add />} disabled={imagePreviews.length >= 3}>
-                Adjuntar Fotos
-              </Button>
-            </label>
+            {!readOnly && ( // Only show button if not in readOnly mode
+              <label htmlFor="task-file-upload">
+                <Button variant="outlined" component="span" startIcon={<Add />} disabled={imagePreviews.length >= 3 || readOnly}>
+                  Adjuntar Fotos
+                </Button>
+              </label>
+            )}
             <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, mt: 2 }}>
               {imagePreviews.map(preview => (
                 <Card key={preview.id} sx={{ maxWidth: 150, position: 'relative' }}>
                   <img src={preview.url} alt="Preview" style={{ width: '100%', height: 100, objectFit: 'cover' }} />
-                  <IconButton
-                    size="small"
-                    sx={{
-                      position: 'absolute',
-                      top: 4,
-                      right: 4,
-                      backgroundColor: 'rgba(255,255,255,0.7)',
-                      '&:hover': { backgroundColor: 'rgba(255,255,255,0.9)' }
-                    }}
-                    onClick={() => handleRemoveImage(preview.id)}
-                  >
-                    <Delete fontSize="small" />
-                  </IconButton>
+                  {!readOnly && ( // Only show remove button if not in readOnly mode
+                    <IconButton
+                      size="small"
+                      sx={{
+                        position: 'absolute',
+                        top: 4,
+                        right: 4,
+                        backgroundColor: 'rgba(255,255,255,0.7)',
+                        '&:hover': { backgroundColor: 'rgba(255,255,255,0.9)' }
+                      }}
+                      onClick={() => handleRemoveImage(preview.id)}
+                    >
+                      <Delete fontSize="small" />
+                    </IconButton>
+                  )}
                 </Card>
               ))}
             </Box>
@@ -203,8 +208,10 @@ const TaskFormModal = ({ open, onClose, onSave, task, projectId }: { open: boole
         </Grid>
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose}>Cancelar</Button>
-        <Button onClick={handleSave} variant="contained">Guardar</Button>
+        <Button onClick={onClose}>Cerrar</Button> {/* Always show a close button */}
+        {!readOnly && ( // Only show Save button if not in readOnly mode
+          <Button onClick={handleSave} variant="contained">Guardar</Button>
+        )}
       </DialogActions>
     </Dialog>
   );
@@ -223,6 +230,7 @@ const ProjectDetail = () => {
   const [taskModalOpen, setTaskModalOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [taskImageUrls, setTaskImageUrls] = useState<Record<string, {name: string, url: string}[]>>({});
+  const [isModalReadOnly, setIsModalReadOnly] = useState(false); // New state for read-only mode
 
   useEffect(() => {
     if (!project) {
@@ -275,11 +283,19 @@ const ProjectDetail = () => {
 
   const handleOpenNewTask = () => {
     setEditingTask({ id: `new-${crypto.randomUUID()}`, name: "Nueva Tarea", duration: "1d", startDate: new Date().toISOString().split('T')[0], endDate: "", estimatedTime: "8h", assignee: "Sin asignar", notes: "", budget: 0, completed: false });
+    setIsModalReadOnly(false); // New tasks are always editable
     setTaskModalOpen(true);
   };
   
   const handleOpenEditTask = (task: Task) => {
     setEditingTask(task);
+    setIsModalReadOnly(false); // Editing an existing task
+    setTaskModalOpen(true);
+  };
+
+  const handleViewTask = (task: Task) => {
+    setEditingTask(task);
+    setIsModalReadOnly(true); // Viewing a task (read-only)
     setTaskModalOpen(true);
   };
 
@@ -465,6 +481,7 @@ const ProjectDetail = () => {
                   <Box display="flex" justifyContent="space-between" alignItems="center">
                     <FormControlLabel control={<Checkbox checked={task.completed} onChange={e => handleSaveTask({ ...task, completed: e.target.checked })} />} label={<Typography variant="h6" sx={{ textDecoration: task.completed ? 'line-through' : 'none' }}>{task.name}</Typography>} />
                     <Box>
+                      <IconButton color="default" onClick={() => handleViewTask(task)}><Visibility /></IconButton> {/* New View button */}
                       <IconButton color="default" onClick={() => handleOpenEditTask(task)}><Edit /></IconButton>
                       <IconButton color="error" onClick={() => handleDeleteTask(task.id)}><Delete /></IconButton>
                     </Box>
@@ -480,15 +497,6 @@ const ProjectDetail = () => {
                       <Typography variant="body2" color="text.secondary">{task.notes}</Typography>
                     </Paper>
                   )}
-                  {taskImageUrls[task.id] && taskImageUrls[task.id].length > 0 && (
-                    <Box sx={{ mt: 2, display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                      {taskImageUrls[task.id].map((image, index) => (
-                        <Card key={index} sx={{ width: 100, height: 100, overflow: 'hidden' }}>
-                          <img src={image.url} alt={`Task attachment ${index + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                        </Card>
-                      ))}
-                    </Box>
-                  )}
                 </Box>
               </Paper>
             ))}
@@ -502,6 +510,7 @@ const ProjectDetail = () => {
         onSave={handleSaveTask}
         task={editingTask}
         projectId={project._id}
+        readOnly={isModalReadOnly}
       />
 
       <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)}>
