@@ -146,7 +146,7 @@ const ProjectDetail = () => {
         Volver al Dashboard
       </Button>
 
-      <Card elevation={4}>
+      <Card elevation={8}>
         <CardHeader
           title={<Typography variant="h3" component="h1" gutterBottom>{project.name}</Typography>}
           subheader={`ID: ${project._id}`}
@@ -278,7 +278,7 @@ const Dashboard = () => {
             const stats = getStats(proj.tasks);
             return (
               <Grid item xs={12} sm={6} md={4} key={proj._id}>
-                <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column', transition: 'transform 0.3s, box-shadow 0.3s', '&:hover': { transform: 'translateY(-4px)', boxShadow: 6 } }}>
+                <Card elevation={8} sx={{ height: '100%', display: 'flex', flexDirection: 'column', transition: 'transform 0.3s, box-shadow 0.3s', '&:hover': { transform: 'translateY(-4px)', boxShadow: 12 } }}>
                   <CardActionArea component={RouterLink} to={`/project/${proj._id}`}>
                     <CardHeader
                       avatar={<Assignment fontSize="large" color="primary" />}
