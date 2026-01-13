@@ -9,7 +9,7 @@ import {
   Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, FormControlLabel, Checkbox
 } from '@mui/material';
 import {
-  Add, CheckCircle, RadioButtonUnchecked, BusinessCenter, CalendarToday, Person, AttachMoney,
+  Add, CheckCircle, RadioButtonUnchecked, Assignment, CalendarToday, Person, AttachMoney,
   Edit, Save, ArrowBack, Delete, GridView, Notes, Brightness4, Brightness7
 } from '@mui/icons-material';
 import { useTheme } from './ThemeContext';
@@ -179,7 +179,7 @@ const ProjectDetail = () => {
               <Paper 
                 key={task.id} 
                 elevation={1}
-                sx={{ p: 2, opacity: task.completed ? 0.7 : 1, bgcolor: task.completed ? 'grey.50' : 'background.paper' }}
+                sx={{ p: 2, opacity: task.completed ? 0.7 : 1, bgcolor: task.completed ? 'background.default' : 'background.paper' }}
               >
                 <Box>
                   <Box display="flex" justifyContent="space-between" alignItems="center">
@@ -196,7 +196,7 @@ const ProjectDetail = () => {
                     <Chip icon={<CalendarToday />} label={`Fin: ${task.endDate || 'N/A'}`} size="small" />
                   </Stack>
                   {task.notes && (
-                    <Paper elevation={0} variant="outlined" sx={{ p: 2, mt: 2, bgcolor: 'grey.100' }}>
+                    <Paper elevation={0} variant="outlined" sx={{ p: 2, mt: 2, bgcolor: 'background.paper' }}>
                       <Typography variant="body2" color="text.secondary">{task.notes}</Typography>
                     </Paper>
                   )}
@@ -281,7 +281,7 @@ const Dashboard = () => {
                 <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column', transition: 'transform 0.3s, box-shadow 0.3s', '&:hover': { transform: 'translateY(-4px)', boxShadow: 6 } }}>
                   <CardActionArea component={RouterLink} to={`/project/${proj._id}`}>
                     <CardHeader
-                      avatar={<BusinessCenter fontSize="large" color="primary" />}
+                      avatar={<Assignment fontSize="large" color="primary" />}
                       action={<Chip label={`$${stats.budget.toLocaleString()}`} />}
                       title={<Typography variant="h5">{proj.name}</Typography>}
                     />
@@ -302,7 +302,7 @@ const Dashboard = () => {
         </Grid>
       ) : (
         <Paper elevation={0} variant="outlined" sx={{ py: 10, textAlign: 'center', borderStyle: 'dashed' }}>
-          <BusinessCenter sx={{ fontSize: 60, color: 'text.secondary' }} />
+          <Assignment sx={{ fontSize: 60, color: 'text.secondary' }} />
           <Typography variant="h5" component="h2" sx={{ mt: 2 }}>No hay proyectos todavía</Typography>
           <Typography color="text.secondary" sx={{ mt: 1 }}>
             Crea tu primer proyecto para empezar a organizar tus tareas.

@@ -8,11 +8,14 @@ export const lightTheme = createTheme({
       paper: '#ffffff',
     },
     primary: {
-      main: '#3f51b5',
+      main: '#4C9A2A',
     },
     secondary: {
       main: '#f50057',
     },
+  },
+  shape: {
+    borderRadius: 8,
   },
 });
 
@@ -24,10 +27,13 @@ export const darkTheme = createTheme({
       paper: '#1e1e1e',
     },
     primary: {
-      main: '#90caf9',
+      main: '#4C9A2A',
     },
     secondary: {
       main: '#f48fb1',
     },
+  },
+  shape: {
+    borderRadius: 8,
   },
 });
