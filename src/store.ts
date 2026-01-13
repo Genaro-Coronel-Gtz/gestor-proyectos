@@ -13,6 +13,7 @@ export interface Task {
   notes: string;
   budget: number;
   completed: boolean;
+  photoAttachmentNames?: string[];
 }
 
 // Definimos la interfaz del Proyecto
@@ -51,14 +52,6 @@ const projectsSlice = createSlice({
       const index = state.list.findIndex(p => p._id === action.payload._id);
       if (index !== -1) {
         state.list[index] = action.payload;
-        
-        // Lógica de actualización en PouchDB
-        db.get(action.payload._id).then(doc => {
-          return db.put({
-            ...doc,
-            ...action.payload
-          });
-        }).catch(err => console.error("Error actualizando PouchDB:", err));
       }
     },
     // Aquí pasamos solo el ID del proyecto a eliminar
