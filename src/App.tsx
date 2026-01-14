@@ -26,6 +26,32 @@ const getStats = (tasks: Task[]) => {
   return { percentage, completed, total, budget };
 };
 
+// --- UTILITIES FOR BASE64 CONVERSION ---
+const blobToBase64 = (blob: Blob): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      if (typeof reader.result === 'string') {
+        resolve(reader.result);
+      } else {
+        reject(new Error("Failed to convert blob to base64."));
+      }
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+};
+
+const base64toBlob = (base64: string, contentType: string = ''): Blob => {
+  const byteString = atob(base64.split(',')[1]); // Remove data URL prefix
+  const ab = new ArrayBuffer(byteString.length);
+  const ia = new Uint8Array(ab);
+  for (let i = 0; i < byteString.length; i++) {
+    ia[i] = byteString.charCodeAt(i);
+  }
+  return new Blob([ab], { type: contentType });
+};
+
 // Interface for image previews in TaskFormModal
 interface ImagePreview {
   id: string; // Unique ID for keying
@@ -251,7 +277,10 @@ const ProjectDetail = () => {
               try {
                 const blob = await db.getAttachment(project._id, attachmentName);
                 if (blob) {
-                  taskSpecificUrls.push({ name: attachmentName, url: URL.createObjectURL(blob as Blob) });
+                  console.log('Fetched Blob type for display:', (blob as Blob).type, 'size:', (blob as Blob).size); // DEBUG LOG
+                  const url = URL.createObjectURL(blob as Blob);
+                  console.log('Generated Object URL:', url); // DEBUG LOG
+                  taskSpecificUrls.push({ name: attachmentName, url: url });
                 }
               } catch (error) {
                 console.error(`Error fetching attachment ${attachmentName} for task ${task.id}:`, error);
@@ -535,6 +564,150 @@ const Dashboard = () => {
   const [name, setName] = useState('');
   const { mode, toggleTheme } = useTheme();
 
+  const handleExportData = async () => {
+    const allProjects = projects; // Get projects from Redux state
+
+    const exportData: Project[] = [];
+
+    for (const project of allProjects) {
+      const projectCopy: Project = JSON.parse(JSON.stringify(project)); // Deep copy project
+      projectCopy.tasks = []; // Reset tasks to build them with attachment data
+
+      for (const task of project.tasks) {
+        const taskCopy: Task = JSON.parse(JSON.stringify(task)); // Deep copy task
+        const attachmentsData: { name: string, data: string, contentType: string }[] = [];
+
+        if (task.photoAttachmentNames && task.photoAttachmentNames.length > 0) {
+          for (const attachmentName of task.photoAttachmentNames) {
+            try {
+              const blob = await db.getAttachment(project._id, attachmentName);
+              if (blob) {
+                const base64 = await blobToBase64(blob as Blob);
+                attachmentsData.push({
+                  name: attachmentName,
+                  data: base64,
+                  contentType: blob.type // Assuming blob.type is available
+                });
+              }
+            } catch (error) {
+              console.error(`Error fetching attachment ${attachmentName} for export:`, error);
+            }
+          }
+        }
+        // Add attachments data to taskCopy for export
+        (taskCopy as any)._attachmentsData = attachmentsData; // Add temporary property
+        delete taskCopy.photoAttachmentNames; // Remove original references
+
+        projectCopy.tasks.push(taskCopy);
+      }
+      exportData.push(projectCopy);
+    }
+
+    const jsonString = JSON.stringify(exportData, null, 2);
+    const blob = new Blob([jsonString], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'task-manager-data.json';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    console.log('Datos exportados.');
+  };
+
+  const handleImportData = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    console.log('Importar datos...');
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      try {
+        const jsonString = e.target?.result as string;
+        const importedProjects: Project[] = JSON.parse(jsonString);
+        const projectsToSave: Project[] = [];
+
+        for (let project of importedProjects) {
+          // Generate new _id for project to avoid conflicts
+          const newProjectId = crypto.randomUUID();
+          project._id = newProjectId;
+          project._rev = undefined; // Ensure no _rev from import
+
+          // Prepare project for initial save (without attachments, but explicitly setting _attachments field)
+          let projectToPut = { ...project, tasks: [] as Task[], _attachments: {} }; // Added _attachments: {}
+
+          // Save project to get initial _rev
+          let saveResponse = await db.put(projectToPut);
+          project._rev = saveResponse.rev; // Update project with new _rev
+
+          const newTasks: Task[] = [];
+          for (let task of project.tasks) {
+            // Generate new id for task
+            const newTaskId = crypto.randomUUID();
+            task.id = newTaskId;
+
+            const photoAttachmentNames: string[] = [];
+            const attachmentsData = (task as any)._attachmentsData as { name: string, data: string, contentType: string }[] || [];
+
+                          for (const attachment of attachmentsData) {
+                            try {
+                              const blob = base64toBlob(attachment.data, attachment.contentType);
+                              console.log('Imported Blob type:', blob.type, 'size:', blob.size); // DEBUG LOG
+                              const attachmentId = `task-${task.id}-photo-${crypto.randomUUID()}`;
+            
+                              // Fetch the latest project document *before* putting each attachment, including attachments data
+                              const latestProjectDoc = await db.get(project._id, { attachments: true }); // <--- Added { attachments: true }
+                              project._rev = latestProjectDoc._rev; // Ensure we have the very latest _rev
+            
+                              // Put attachment, updating project _rev
+                              const putAttachmentResponse = await db.putAttachment(
+                                project._id,
+                                attachmentId,
+                                project._rev, // Use current project _rev
+                                blob,
+                                attachment.contentType
+                              );
+                              project._rev = putAttachmentResponse.rev; // Update project _rev after attachment
+                              photoAttachmentNames.push(attachmentId);
+                              console.log('Imported attachmentId:', attachmentId, 'for task:', task.id); // DEBUG LOG
+                            } catch (attachmentError) {
+                              console.error(`Error importing attachment ${attachment.name} for task ${task.id}:`, attachmentError);
+                            }
+                          }            task.photoAttachmentNames = photoAttachmentNames;
+            delete (task as any)._attachmentsData; // Clean up temporary property
+            newTasks.push(task);
+          }
+          project.tasks = newTasks; // Assign new tasks to project
+
+          // Final update of project with all tasks and attachments data
+          // FIX: Fetch the document with attachments and merge it before saving
+          const docFromDb = await db.get(project._id, { attachments: true });
+          const finalProjectData = {
+            ...project,
+            _attachments: docFromDb._attachments,
+          };
+
+          await db.put(finalProjectData);
+          projectsToSave.push(finalProjectData);
+        }
+
+        // After all projects are processed, refresh Redux state
+        const allDocs = await db.allDocs({ include_docs: true });
+        const docs = allDocs.rows.map(row => row.doc).filter((doc): doc is Project & { _rev: string } => !!doc);
+        dispatch(setProjects(docs));
+        console.log('Datos importados con éxito.');
+
+      } catch (error) {
+        console.error('Error al importar datos:', error);
+      }
+    };
+    reader.readAsText(file);
+
+    // Reset the input value so the same file can be imported again
+    event.target.value = ''; 
+  };
+
   return (
     <Container maxWidth="lg" sx={{ py: 5 }}>
       <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems="center" spacing={2} sx={{ mb: 6 }}>
@@ -549,6 +722,19 @@ const Dashboard = () => {
             Gestiona tus tareas y presupuestos en un solo lugar.
           </Typography>
         </Box>
+        <Stack direction="row" spacing={2} alignItems="center">
+          <Button variant="outlined" onClick={handleExportData}>Exportar Datos</Button>
+          <input
+            type="file"
+            accept=".json"
+            id="import-file"
+            style={{ display: 'none' }}
+            onChange={handleImportData}
+          />
+          <label htmlFor="import-file">
+            <Button variant="outlined" component="span">Importar Datos</Button>
+          </label>
+        </Stack>
         <Paper component="form" sx={{ p: '2px 4px', display: 'flex', alignItems: 'center', width: { xs: '100%', md: 400 } }} onSubmit={(e) => e.preventDefault()}>
           <TextField
             sx={{ ml: 1, flex: 1 }}
