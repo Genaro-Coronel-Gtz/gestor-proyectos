@@ -448,9 +448,6 @@ const ProjectDetail = () => {
           subheader={`ID: ${project._id}`}
           action={
             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-              <IconButton sx={{ ml: 1 }} onClick={toggleTheme} color="inherit">
-                {mode === 'dark' ? <Brightness7 /> : <Brightness4 />}
-              </IconButton>
               <Button variant="contained" startIcon={<Add />} onClick={handleOpenNewTask}>
                 Nueva Tarea
               </Button>
