@@ -1,5 +1,5 @@
 import { configureStore, createSlice, type PayloadAction } from '@reduxjs/toolkit';
-import PouchDB from 'pouchdb';
+import { addProject as addProjectToDb, deleteProject as deleteProjectFromDb } from './services/pouchdbService';
 
 // Definimos la interfaz de la Tarea
 export interface Task {
@@ -32,8 +32,6 @@ const initialState: ProjectsState = {
   list: [],
 };
 
-const db = new PouchDB<Project>('projects_db');
-
 const projectsSlice = createSlice({
   name: 'projects',
   initialState,
@@ -45,7 +43,7 @@ const projectsSlice = createSlice({
     // Aquí el payload es un solo objeto Proyecto
     addProject: (state, action: PayloadAction<Project>) => {
       state.list.push(action.payload);
-      db.put(action.payload).catch(err => console.error("Error guardando en PouchDB:", err));
+      addProjectToDb(action.payload).catch(err => console.error("Error guardando en PouchDB:", err));
     },
     // Aquí pasamos el proyecto actualizado
     updateProject: (state, action: PayloadAction<Project>) => {
@@ -57,11 +55,7 @@ const projectsSlice = createSlice({
     // Aquí pasamos solo el ID del proyecto a eliminar
     deleteProject: (state, action: PayloadAction<string>) => {
       state.list = state.list.filter(p => p._id !== action.payload);
-
-      // Lógica de borrado en PouchDB
-      db.get(action.payload).then(doc => {
-        return db.remove(doc);
-      }).catch(err => console.error("Error borrando en PouchDB:", err));
+      deleteProjectFromDb(action.payload).catch(err => console.error("Error borrando en PouchDB:", err));
     }
   }
 });
