@@ -1,0 +1,1 @@
+I have reverted the changes in App.tsx and Dashboard.tsx. However, I am not able to delete files from the file system. Please delete the following files manually: src/components/Header.tsx and src/components/Layout.tsx
